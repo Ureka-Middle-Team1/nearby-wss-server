@@ -25,8 +25,8 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// 반경 기준 (예: 0.1km = 100m)
-const RADIUS_KM = 0.1;
+// 반경 기준 (예: 0.01km = 10m)
+const RADIUS_KM = 0.01;
 
 wss.on("connection", (ws) => {
   console.log("🔗 New client connected");
@@ -89,6 +89,39 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     console.log("❌ Client disconnected");
     clients.delete(ws);
+
+    // 다른 모든 사용자에게 "자신 기준 반경 내 사용자" 목록을 다시 보내주기
+    for (const [otherWs, otherInfo] of clients.entries()) {
+      if (otherWs.readyState === WebSocket.OPEN) {
+        const nearbyUsers = [];
+
+        for (const [ws2, info2] of clients.entries()) {
+          if (ws2 !== otherWs && info2.lat != null && info2.lng != null) {
+            const dist = getDistanceKm(
+              otherInfo.lat,
+              otherInfo.lng,
+              info2.lat,
+              info2.lng
+            );
+            if (dist <= RADIUS_KM) {
+              nearbyUsers.push({
+                userId: info2.userId,
+                lat: info2.lat,
+                lng: info2.lng,
+                distance: Math.round(dist * 1000),
+              });
+            }
+          }
+        }
+
+        otherWs.send(
+          JSON.stringify({
+            type: "nearby_users",
+            users: nearbyUsers,
+          })
+        );
+      }
+    }
   });
 });
 

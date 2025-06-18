@@ -3,6 +3,9 @@ const http = require("http");
 const WebSocket = require("ws");
 const cors = require("cors");
 
+const os = require("os");
+const serverHost = process.env.HOSTNAME || os.hostname();
+
 const app = express();
 app.use(cors());
 
@@ -82,6 +85,7 @@ wss.on("connection", (ws) => {
             JSON.stringify({
               type: "nearby_users",
               users: nearbyUsers,
+              server: serverHost
             })
           );
         }

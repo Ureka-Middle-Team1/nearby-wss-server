@@ -84,8 +84,9 @@ wss.on("connection", (ws) => {
           targetWs.send(
             JSON.stringify({
               type: "nearby_users",
-              users: nearbyUsers,
-              server: serverHost
+              nearbyUsers,
+              allUsers,
+              server: serverHost,
             })
           );
         }

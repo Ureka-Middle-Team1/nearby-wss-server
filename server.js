@@ -28,7 +28,7 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-const RADIUS_KM = 0.01; // 10미터 반경
+const RADIUS_KM = 0.1; // 100미터 반경
 
 wss.on("connection", (ws) => {
   console.log("🔗 New client connected");

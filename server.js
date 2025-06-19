@@ -97,19 +97,18 @@ wss.on("connection", (ws) => {
             })
           );
         }
-      } else if (data.type == "user_click" && data.fromUserId && data.toUserId) {
-        console.log(`👆 ${data.fromUserId}님이 ${data.toUserId}님을 클릭했습니다`);
+      } // ✅ 클릭 이벤트 처리
+      else if (data.type === "clicked_user" && data.from && data.to) {
+        console.log(`👆 ${data.from}님이 ${data.to}님을 클릭했습니다`);
 
-        // to에게 알림 보내기
         for (const [targetWs, info] of clients.entries()) {
-          if (info.userId === data.toUserId && targetWs.readyState === WebSocket.OPEN) {
+          if (info.userId === data.to && targetWs.readyState === WebSocket.OPEN) {
             targetWs.send(
               JSON.stringify({
-                type: "user_clicked",
-                fromUserId: data.fromUserId,
+                type: "click_notice",
+                from: data.from, // ✅ 누가 클릭했는지
               })
             );
-            break;
           }
         }
       }

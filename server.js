@@ -93,7 +93,16 @@ wss.on("connection", (ws) => {
       }
 
       // ✅ 수정된 클릭 이벤트 타입 처리
+      // server.js 내부 수정 (user_click 처리)
       else if (data.type === "user_click" && data.fromUserId && data.toUserId) {
+        const allUserIds = Array.from(clients.values()).map((info) => info.userId);
+        const toIsConnected = allUserIds.includes(data.toUserId);
+
+        if (!toIsConnected) {
+          console.warn(`⚠️ ${data.toUserId}는 아직 등록되지 않음`);
+          return; // 메시지 전송하지 않음
+        }
+
         console.log(`👆 ${data.fromUserId}님이 ${data.toUserId}님을 클릭했습니다`);
 
         for (const [targetWs, info] of clients.entries()) {

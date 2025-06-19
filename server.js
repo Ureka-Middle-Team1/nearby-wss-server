@@ -95,8 +95,7 @@ wss.on("connection", (ws) => {
 
       // ✅ 수정된 클릭 이벤트 타입 처리
       else if (data.type === "user_click" && data.fromUserId && data.toUserId) {
-        const sender = Array.from(clients.values()).find((info) => info.userId === data.fromUserId);
-        const senderName = sender?.userName || data.fromUserId; // 기본값으로 userId
+        const senderName = data.fromUserName || data.fromUserId;
 
         for (const [targetWs, info] of clients.entries()) {
           if (info.userId === data.toUserId && targetWs.readyState === WebSocket.OPEN) {
@@ -104,8 +103,9 @@ wss.on("connection", (ws) => {
               JSON.stringify({
                 type: "click_notice",
                 fromUserId: data.fromUserId,
-                fromUserName: senderName, // ✅ 이름 포함
+                fromUserName: senderName,
                 toUserId: data.toUserId,
+                toUserName: info.userName, // ✅ 수신자 이름도 함께 전달
               })
             );
           }

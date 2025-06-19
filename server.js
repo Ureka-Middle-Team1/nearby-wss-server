@@ -97,6 +97,21 @@ wss.on("connection", (ws) => {
             })
           );
         }
+      } else if (data.type == "user_click" && data.fromUserId && data.toUserId) {
+        console.log(`👆 ${data.fromUserId}님이 ${data.toUserId}님을 클릭했습니다`);
+
+        // to에게 알림 보내기
+        for (const [targetWs, info] of clients.entries()) {
+          if (info.userId === data.toUserId && targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(
+              JSON.stringify({
+                type: "user_clicked",
+                fromUserId: data.fromUserId,
+              })
+            );
+            break;
+          }
+        }
       }
     } catch (err) {
       console.error("❌ 메시지 처리 중 오류:", err.message);

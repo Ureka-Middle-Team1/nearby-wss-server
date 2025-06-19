@@ -11,12 +11,10 @@ app.use(cors());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// 접속 클라이언트 정보 저장: Map<ws, { userId, lat, lng }>
-const clients = new Map();
+const clients = new Map(); // Map<ws, { userId, lat, lng }>
 
-// 거리 계산 함수 (Haversine 공식)
 function getDistanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371; // 지구 반지름 (km)
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -26,7 +24,7 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-const RADIUS_KM = 0.1; // 100미터 반경
+const RADIUS_KM = 0.1;
 
 wss.on("connection", (ws) => {
   console.log("🔗 New client connected");
@@ -36,14 +34,12 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(message.toString());
 
       if (data.type === "location_update" && data.userId && data.lat && data.lng) {
-        // 위치 정보 저장
         clients.set(ws, {
           userId: data.userId,
           lat: data.lat,
           lng: data.lng,
         });
 
-        // ✅ 모든 사용자 정보 수집
         const allUsers = [];
         for (const [, info] of clients.entries()) {
           if (info.userId && info.lat != null && info.lng != null) {
@@ -55,12 +51,10 @@ wss.on("connection", (ws) => {
           }
         }
 
-        // ✅ 각 사용자에게 nearby + allUsers 목록 전송
         for (const [targetWs, targetInfo] of clients.entries()) {
           if (targetWs.readyState !== WebSocket.OPEN) continue;
 
           const nearbyUsers = [];
-
           for (const [, otherInfo] of clients.entries()) {
             if (
               targetInfo.lat != null &&
@@ -81,13 +75,12 @@ wss.on("connection", (ws) => {
                   userId: otherInfo.userId,
                   lat: otherInfo.lat,
                   lng: otherInfo.lng,
-                  distance: Math.round(dist * 1000), // m 단위
+                  distance: Math.round(dist * 1000),
                 });
               }
             }
           }
 
-          // 전송
           targetWs.send(
             JSON.stringify({
               type: "nearby_users",
@@ -97,16 +90,18 @@ wss.on("connection", (ws) => {
             })
           );
         }
-      } // ✅ 클릭 이벤트 처리
-      else if (data.type === "clicked_user" && data.from && data.to) {
-        console.log(`👆 ${data.from}님이 ${data.to}님을 클릭했습니다`);
+      }
+
+      // ✅ 수정된 클릭 이벤트 타입 처리
+      else if (data.type === "user_click" && data.fromUserId && data.toUserId) {
+        console.log(`👆 ${data.fromUserId}님이 ${data.toUserId}님을 클릭했습니다`);
 
         for (const [targetWs, info] of clients.entries()) {
-          if (info.userId === data.to && targetWs.readyState === WebSocket.OPEN) {
+          if (info.userId === data.toUserId && targetWs.readyState === WebSocket.OPEN) {
             targetWs.send(
               JSON.stringify({
                 type: "click_notice",
-                from: data.from, // ✅ 누가 클릭했는지
+                from: data.fromUserId,
               })
             );
           }
@@ -123,7 +118,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-// 서버 시작
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🚀 WebSocket server running on http://localhost:${PORT}`);

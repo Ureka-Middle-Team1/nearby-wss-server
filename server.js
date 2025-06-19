@@ -51,7 +51,6 @@ wss.on("connection", (ws) => {
               userId: info.userId,
               lat: info.lat,
               lng: info.lng,
-              connectedAt: info.connectedAt,
             });
           }
         }
@@ -83,7 +82,6 @@ wss.on("connection", (ws) => {
                   lat: otherInfo.lat,
                   lng: otherInfo.lng,
                   distance: Math.round(dist * 1000), // m 단위
-                  connectedAt: otherInfo.connectedAt,
                 });
               }
             }

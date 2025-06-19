@@ -21,11 +21,26 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+function getNearbyUsers(centerLat, centerLng, excludeUserIds = []) {
+  return Array.from(clients.values())
+    .filter(
+      (c) =>
+        c.lat != null &&
+        c.lng != null &&
+        !excludeUserIds.includes(c.userId) &&
+        getDistanceKm(centerLat, centerLng, c.lat, c.lng) <= RADIUS_KM
+    )
+    .map((c) => ({
+      userId: c.userId,
+      lat: c.lat,
+      lng: c.lng,
+      distance: Math.round(getDistanceKm(centerLat, centerLng, c.lat, c.lng) * 1000),
+    }));
 }
 
 const RADIUS_KM = 0.1; // 100미터 반경
@@ -37,12 +52,37 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
-      if (
-        data.type === "location_update" &&
-        data.userId &&
-        data.lat &&
-        data.lng
-      ) {
+      // 쿨릭 이벤트 처리
+      if (data.type === "user_click" && data.from && data.to) {
+        console.log(`사용자 ${data.from} -> ${data.to} 클릭`);
+
+        //form 을 찾기 위해 해당 ws 찾기
+        const fromEntry = [...clients.entries()].find(([, info]) => info.userId === data.from);
+        if (!fromEntry) return;
+
+        const [fromWs, fromInfo] = fromEntry;
+        if (fromWs.readyState !== WebSocket.OPEN) return;
+
+        const nearbyUsers = getNearbyUsers(fromInfo.lat, fromInfo.lng, [data.to, data.from]);
+
+        const allUsers = Array.from(clients.values()).map(({ userId, lat, lng }) => ({
+          userId,
+          lat,
+          lng,
+        }));
+
+        fromWs.send(
+          JSON.stringify({
+            type: "nearby_users",
+            nearbyUsers,
+            allUsers,
+            server: serverHost,
+          })
+        );
+      }
+
+      // 위치 업데이트 처리
+      if (data.type === "location_update" && data.userId && data.lat && data.lng) {
         // 위치 정보 저장
         clients.set(ws, {
           userId: data.userId,
@@ -51,50 +91,17 @@ wss.on("connection", (ws) => {
         });
 
         // ✅ 모든 사용자 정보 수집
-        const allUsers = [];
-        for (const [, info] of clients.entries()) {
-          if (info.userId && info.lat != null && info.lng != null) {
-            allUsers.push({
-              userId: info.userId,
-              lat: info.lat,
-              lng: info.lng,
-            });
-          }
-        }
+        const allUsers = Array.from(clients.values()).map(({ userId, lat, lng }) => ({
+          userId,
+          lat,
+          lng,
+        }));
 
-        // ✅ 각 사용자에게 nearby + allUsers 목록 전송
         for (const [targetWs, targetInfo] of clients.entries()) {
           if (targetWs.readyState !== WebSocket.OPEN) continue;
 
-          const nearbyUsers = [];
+          const nearbyUsers = getNearbyUsers(targetInfo.lat, targetInfo.lng, [targetInfo.userId]);
 
-          for (const [, otherInfo] of clients.entries()) {
-            if (
-              targetInfo.lat != null &&
-              targetInfo.lng != null &&
-              otherInfo.lat != null &&
-              otherInfo.lng != null &&
-              targetInfo !== otherInfo
-            ) {
-              const dist = getDistanceKm(
-                targetInfo.lat,
-                targetInfo.lng,
-                otherInfo.lat,
-                otherInfo.lng
-              );
-
-              if (dist <= RADIUS_KM) {
-                nearbyUsers.push({
-                  userId: otherInfo.userId,
-                  lat: otherInfo.lat,
-                  lng: otherInfo.lng,
-                  distance: Math.round(dist * 1000), // m 단위
-                });
-              }
-            }
-          }
-
-          // 전송
           targetWs.send(
             JSON.stringify({
               type: "nearby_users",

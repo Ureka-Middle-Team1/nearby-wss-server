@@ -13,6 +13,7 @@ const wss = new WebSocket.Server({ server });
 
 // 접속 클라이언트 정보 저장: Map<ws, { userId, lat, lng }>
 const clients = new Map();
+const clickedPairs = new Set(); //Set<string> 형태로 from -> to 클릭 상태 저장
 
 // 거리 계산 함수 (Haversine 공식)
 function getDistanceKm(lat1, lon1, lat2, lon2) {
@@ -26,23 +27,6 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-function getNearbyUsers(centerLat, centerLng, excludeUserIds = []) {
-  return Array.from(clients.values())
-    .filter(
-      (c) =>
-        c.lat != null &&
-        c.lng != null &&
-        !excludeUserIds.includes(c.userId) &&
-        getDistanceKm(centerLat, centerLng, c.lat, c.lng) <= RADIUS_KM
-    )
-    .map((c) => ({
-      userId: c.userId,
-      lat: c.lat,
-      lng: c.lng,
-      distance: Math.round(getDistanceKm(centerLat, centerLng, c.lat, c.lng) * 1000),
-    }));
-}
-
 const RADIUS_KM = 0.1; // 100미터 반경
 
 wss.on("connection", (ws) => {
@@ -52,19 +36,71 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
+      if (data.type === "location_update" && data.userId && data.lat && data.lng) {
+        clients.set(ws, {
+          userId: data.userId,
+          lat: data.lat,
+          lng: data.lng,
+        });
+
+        const allUsers = Array.from(clients.values()).map((c) => ({
+          userId: c.userId,
+          lat: c.lat,
+          lng: c.lng,
+        }));
+
+        for (const [targetWs, targetInfo] of clients.entries()) {
+          if (targetWs.readyState !== WebSocket.OPEN) continue;
+
+          const nearbyUsers = Array.from(clients.values())
+            .filter((c) => {
+              if (
+                !c.userId ||
+                c.userId === targetInfo.userId ||
+                c.lat == null ||
+                c.lng == null ||
+                targetInfo.lat == null ||
+                targetInfo.lng == null
+              )
+                return false;
+
+              const dist = getDistanceKm(targetInfo.lat, targetInfo.lng, c.lat, c.lng);
+              return dist <= RADIUS_KM;
+            })
+            .map((c) => ({
+              userId: c.userId,
+              lat: c.lat,
+              lng: c.lng,
+              distance: Math.round(
+                getDistanceKm(targetInfo.lat, targetInfo.lng, c.lat, c.lng) * 1000
+              ),
+            }));
+
+          targetWs.send(
+            JSON.stringify({
+              type: "nearby_users",
+              nearbyUsers,
+              allUsers,
+              server: serverHost,
+            })
+          );
+        }
+      }
+
       // 쿨릭 이벤트 처리
       if (data.type === "user_click" && data.from && data.to) {
         console.log(`사용자 ${data.from} -> ${data.to} 클릭`);
 
-        //form 을 찾기 위해 해당 ws 찾기
         const fromEntry = [...clients.entries()].find(([, info]) => info.userId === data.from);
         if (!fromEntry) return;
 
         const [fromWs, fromInfo] = fromEntry;
         if (fromWs.readyState !== WebSocket.OPEN) return;
 
-        const nearbyUsers = getNearbyUsers(fromInfo.lat, fromInfo.lng, [data.to, data.from]);
+        // 클릭 상태 기록
+        clickedPairs.add(`${data.from}->${data.to}`);
 
+        const nearbyUsers = getNearbyUsers(fromInfo.lat, fromInfo.lng, [data.to, data.from]);
         const allUsers = Array.from(clients.values()).map(({ userId, lat, lng }) => ({
           userId,
           lat,
@@ -82,38 +118,16 @@ wss.on("connection", (ws) => {
       }
 
       // 위치 업데이트 처리
-      if (data.type === "location_update" && data.userId && data.lat && data.lng) {
-        // 위치 정보 저장
-        clients.set(ws, {
-          userId: data.userId,
-          lat: data.lat,
-          lng: data.lng,
-        });
-
-        // ✅ 모든 사용자 정보 수집
-        const allUsers = Array.from(clients.values()).map(({ userId, lat, lng }) => ({
-          userId,
-          lat,
-          lng,
-        }));
-
-        for (const [targetWs, targetInfo] of clients.entries()) {
-          if (targetWs.readyState !== WebSocket.OPEN) continue;
-
-          const nearbyUsers = getNearbyUsers(targetInfo.lat, targetInfo.lng, [targetInfo.userId]);
-
-          targetWs.send(
-            JSON.stringify({
-              type: "nearby_users",
-              nearbyUsers,
-              allUsers,
-              server: serverHost,
-            })
-          );
+      if (data.type === "user_click" && data.from && data.to) {
+        console.log(`📍 ${data.from} clicked ${data.to}`);
+        const fromWs = [...clients.entries()].find(([, info]) => info.userId === data.from)?.[0];
+        if (fromWs && fromWs.readyState === WebSocket.OPEN) {
+          // 알림 또는 추가 동작은 여기에
+          fromWs.send(JSON.stringify({ type: "clicked_ack", to: data.to }));
         }
       }
     } catch (err) {
-      console.error("❌ 메시지 처리 중 오류:", err.message);
+      console.error("❌ Error handling message:", err.message);
     }
   });
 

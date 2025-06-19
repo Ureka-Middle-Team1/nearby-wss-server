@@ -33,9 +33,10 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
-      if (data.type === "location_update" && data.userId && data.lat && data.lng) {
+      if (data.type === "location_update" && data.userId && data.lat && data.lng && data.userName) {
         clients.set(ws, {
           userId: data.userId,
+          userName: data.userName,
           lat: data.lat,
           lng: data.lng,
         });

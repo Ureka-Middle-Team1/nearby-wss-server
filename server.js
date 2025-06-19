@@ -93,24 +93,18 @@ wss.on("connection", (ws) => {
       }
 
       // ✅ 수정된 클릭 이벤트 타입 처리
-      // server.js 내부 수정 (user_click 처리)
       else if (data.type === "user_click" && data.fromUserId && data.toUserId) {
-        const allUserIds = Array.from(clients.values()).map((info) => info.userId);
-        const toIsConnected = allUserIds.includes(data.toUserId);
-
-        if (!toIsConnected) {
-          console.warn(`⚠️ ${data.toUserId}는 아직 등록되지 않음`);
-          return; // 메시지 전송하지 않음
-        }
-
-        console.log(`👆 ${data.fromUserId}님이 ${data.toUserId}님을 클릭했습니다`);
+        const sender = Array.from(clients.values()).find((info) => info.userId === data.fromUserId);
+        const senderName = sender?.userName || data.fromUserId; // 기본값으로 userId
 
         for (const [targetWs, info] of clients.entries()) {
           if (info.userId === data.toUserId && targetWs.readyState === WebSocket.OPEN) {
             targetWs.send(
               JSON.stringify({
                 type: "click_notice",
-                from: data.fromUserId,
+                fromUserId: data.fromUserId,
+                fromUserName: senderName, // ✅ 이름 포함
+                toUserId: data.toUserId,
               })
             );
           }

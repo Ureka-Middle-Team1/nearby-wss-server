@@ -26,6 +26,8 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
 
 const RADIUS_KM = 0.1;
 
+const homeClients = new Set(); // homePage에 접속 중인 클라이언트 목록
+
 wss.on("connection", (ws) => {
   console.log("🔗 New client connected");
 
@@ -34,8 +36,24 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(message.toString());
 
       // 접속 메시지 전송 시 처리
-      if (data.type === "user_join") {
+      if (data.type === "home_ready") {
+        homeClients.add(ws);
+      }
+
+      // NearbyPage 접속 시 알림
+      else if (data.type === "user_join") {
         const userId = data.userId;
+
+        for (const client of homeClients) {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(
+              JSON.stringify({
+                type: "nearby_user_joined",
+                message: "누군가 무물에 함께 접속했습니다!",
+              })
+            );
+          }
+        }
 
         // 접속한 사용자 외 나머지에게 브로드캐스트
         wss.clients.forEach((client) => {

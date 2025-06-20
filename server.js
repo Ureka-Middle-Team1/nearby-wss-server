@@ -38,7 +38,7 @@ wss.on("connection", (ws) => {
         const userId = data.userId;
 
         // 접속한 사용자 외 나머지에게 브로드캐스트
-        wsss.clients.forEach((client) => {
+        wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(
               JSON.stringify({

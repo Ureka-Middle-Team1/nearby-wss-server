@@ -33,7 +33,28 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
-      if (data.type === "location_update" && data.userId && data.lat && data.lng && data.userName) {
+      // 접속 메시지 전송 시 처리
+      if (data.type === "user_join") {
+        const userId = data.userId;
+
+        // 접속한 사용자 외 나머지에게 브로드캐스트
+        wsss.clients.forEach((client) => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            client.send(
+              JSON.stringify({
+                type: "nearby_user_joined",
+                userId: userId,
+              })
+            );
+          }
+        });
+      } else if (
+        data.type === "location_update" &&
+        data.userId &&
+        data.lat &&
+        data.lng &&
+        data.userName
+      ) {
         clients.set(ws, {
           userId: data.userId,
           userName: data.userName,

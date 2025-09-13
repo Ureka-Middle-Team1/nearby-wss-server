@@ -7,7 +7,6 @@ const os = require('os');
 const WS_URL = process.env.WS_URL || 'ws://localhost:8080';
 const CONCURRENCY = Number(process.env.USERS || 30); // 동시 접속 수
 const UPDATE_HZ = Number(process.env.HZ || 1); // 1명이 초당 몇 번 위치전송
-const DURATION_SEC = Number(process.env.DURATION || 30); // 테스트 길이(초)
 const CENTER = { lat: 37.24958126229168, lng: 127.02893793201447 }; // 내 위치
 const SPREAD_M = 50; // 50m 반경
 
@@ -85,16 +84,12 @@ function makeClient(id) {
 
 for (let i = 0; i < CONCURRENCY; i++) makeClient(i + 1);
 
+// 통계 계속 출력 (서버 종료 전까지 무한 유지)
 let elapsed = 0;
-const statsTimer = setInterval(() => {
+setInterval(() => {
   elapsed++;
   const mb = (totalRecvBytes / (1024 * 1024)).toFixed(2);
   console.log(`[t=${elapsed}s] alive=${alive} recvMsgs=${totalRecvMsgs}/s recvBytes=${mb}MB/s`);
   totalRecvBytes = 0;
   totalRecvMsgs = 0;
-  if (elapsed >= DURATION_SEC) {
-    clearInterval(statsTimer);
-    console.log('DONE');
-    process.exit(0);
-  }
 }, 1000);

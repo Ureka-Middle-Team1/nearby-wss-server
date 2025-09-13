@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 const os = require('os');
 
 const WS_URL = process.env.WS_URL || 'ws://localhost:8080';
-const CONCURRENCY = Number(process.env.USERS || 100); // 동시 접속 수
+const CONCURRENCY = Number(process.env.USERS || 30); // 동시 접속 수
 const UPDATE_HZ = Number(process.env.HZ || 1); // 1명이 초당 몇 번 위치전송
 const DURATION_SEC = Number(process.env.DURATION || 30); // 테스트 길이(초)
 const CENTER = { lat: 37.24958126229168, lng: 127.02893793201447 }; // 내 위치

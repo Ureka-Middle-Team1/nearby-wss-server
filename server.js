@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const cors = require('cors');
 const os = require('os');
+const h3 = require('h3-js');
 
 const serverHost = process.env.HOSTNAME || os.hostname();
 const app = express();
@@ -12,6 +13,9 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const clients = new Map(); // Map<ws, { userId, lat, lng }>
+
+const H3_RESOLUTION = 9;
+const spatialIndex = new Map();
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
